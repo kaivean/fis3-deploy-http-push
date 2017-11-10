@@ -1,15 +1,81 @@
+/* eslint-disable */
 /**
- * fis.baidu.com
+ * 参考自fis3-deploy-http-push
  */
 var _ = fis.util;
 var path = require('path');
 var prompt = require('prompt');
 prompt.start();
 
+// 更改： copy from fis.util.upload
+function fisUtilUpload(url, opt, data, content, subpath, callback) {
+  if (typeof content === 'string') {
+    content = new Buffer(content, 'utf8');
+  } else if (!(content instanceof Buffer)) {
+    fis.log.error('unable to upload content [%s]', (typeof content));
+  }
+  opt = opt || {};
+  data = data || {};
+  var endl = '\r\n';
+  var boundary = '-----np' + Math.random();
+  var collect = [];
+  _.map(data, function(key, value) {
+    collect.push('--' + boundary + endl);
+    collect.push('Content-Disposition: form-data; name="' + key + '"' + endl);
+    collect.push(endl);
+    collect.push(value + endl);
+  });
+  collect.push('--' + boundary + endl);
+  collect.push('Content-Disposition: form-data; name="' + (opt.uploadField || "file") + '"; filename="' + subpath + '"' + endl);
+  collect.push(endl);
+  collect.push(content);
+  collect.push(endl);
+  collect.push('--' + boundary + '--' + endl);
+
+  var length = 0;
+  collect.forEach(function(ele) {
+    if (typeof ele === 'string') {
+      length += new Buffer(ele).length;
+    } else {
+      length += ele.length;
+    }
+  });
+
+  opt.method = opt.method || 'POST';
+  opt.headers = _.assign({
+    'Content-Type': 'multipart/form-data; boundary=' + boundary,
+    'Content-Length': length
+  }, opt.headers || {});
+  opt = _.parseUrl(url, opt);
+  var http = opt.protocol === 'https:' ? require('https') : require('http');
+  var req = http.request(opt, function(res) {
+    var status = res.statusCode;
+    var body = '';
+    res
+      .on('data', function(chunk) {
+        body += chunk;
+      })
+      .on('end', function() {
+        if (status >= 200 && status < 300 || status === 304) {
+          callback(null, body);
+        } else {
+          callback(status, body);
+        }
+      })
+      .on('error', function(err) {
+        callback(err.message || err);
+      });
+  });
+  collect.forEach(function(d) {
+    req.write(d);
+  });
+  req.end();
+};
+
 function upload(receiver, to, data, release, content, file, callback) {
   var subpath = file.subpath;
   data['to'] = _(path.join(to, release));
-  fis.util.upload(
+  fisUtilUpload(
       //url, request options, post data, file
       receiver, null, data, content, subpath,
       function(err, res) {
@@ -23,7 +89,11 @@ function upload(receiver, to, data, release, content, file, callback) {
         if (!err && json && json.errno) {
           callback(json);
         } else if (err || !json && res != '0') {
-          callback('upload file [' + subpath + '] to [' + to + '] by receiver [' + receiver + '] error [' + (err || res) + ']');
+          if (res) {
+
+          }
+
+          callback('upload file [' + subpath + '] to [' + to + '] by receiver [' + receiver + '] error [' + (err) + '] [' + (res) + ']');
         } else {
           var time = '[' + fis.log.now(true) + ']';
           process.stdout.write(
@@ -206,6 +276,9 @@ module.exports = function(options, modified, total, callback) {
 
       upload(receiver, to, data, file.getHashRelease(), file.getContent(), file, function(error) {
         if (error) {
+          // 更改：开启watch，也就是子进程里
+          let isChild = process.argv.indexOf('--child-flag') > -1;
+
           if (error.errno === 100302 || error.errno === 100305) {
             // 检测到后端限制了上传，要求用户输入信息再继续。
 
@@ -214,18 +287,30 @@ module.exports = function(options, modified, total, callback) {
             }
 
             if (info.email) {
-              console.error('\nToken is invalid: ', error.errmsg, '\n');
+              fis.util.colorLog.error('\nToken is invalid: ', error.errmsg, '\n');
             }
 
             requireEmail(authApi, validateApi, info, function(error) {
               if (error) {
-                throw new Error('Auth failed! ' + error.errmsg);
+                // 更改：开启watch，也就是子进程里， 由于这里是异步操作，抛出错误， build监听不到,会导致子进程非0退出，子进程又自动重启，因此这里只打印错误
+                if (isChild) { // 开启watch了，有些错误不想做为非0退出，因为子进程非0退出，会重启
+                    fis.util.colorLog.error('Error: Auth failed! ' + error.errmsg);
+                }
+                else {
+                  throw new Error('Auth failed! ' + error.errmsg);
+                }
               } else {
                 _upload(next);
               }
             });
           } else if (options.retry && !--reTryCount) {
-            throw new Error(error.errmsg || error);
+            // 更改：开启watch，也就是子进程里， 由于这里是异步操作，抛出错误， build监听不到,会导致子进程非0退出，子进程又自动重启，因此这里只打印错误
+            if (isChild) { // 开启watch了，有些错误不想做为非0退出，因为子进程非0退出，会重启
+                fis.util.colorLog.error('Error: ', error.errmsg || error);
+            }
+            else {
+              throw new Error('Auth failed! ' + error.errmsg);
+            }
           } else {
             _upload(next);
           }

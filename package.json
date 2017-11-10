@@ -1,7 +1,7 @@
 {
-  "name": "fis3-deploy-http-push",
-  "version": "2.0.6",
-  "description": "fis3 deploy http-push plugin",
+  "name": "fis3-deploy-ala-http-push",
+  "version": "2.0.7",
+  "description": "fis3 deploy http-push plugin for ala",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -16,7 +16,7 @@
   "license": "BSD",
   "repository": {
     "type": "git",
-    "url": "https://github.com/fex-team/fis3-deploy-http-push.git"
+    "url": "https://github.com/kaivean/fis3-deploy-http-push"
   },
   "dependencies": {
     "prompt": "1.0.0"
