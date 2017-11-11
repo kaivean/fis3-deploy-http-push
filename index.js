@@ -89,11 +89,7 @@ function upload(receiver, to, data, release, content, file, callback) {
         if (!err && json && json.errno) {
           callback(json);
         } else if (err || !json && res != '0') {
-          if (res) {
-
-          }
-
-          callback('upload file [' + subpath + '] to [' + to + '] by receiver [' + receiver + '] error [' + (err) + '] [' + (res) + ']');
+          callback('upload file [' + subpath + '] to [' + to + '] by receiver [' + receiver + '] error [' + (err) + '] [' + (res || '') + ']');
         } else {
           var time = '[' + fis.log.now(true) + ']';
           process.stdout.write(
@@ -292,25 +288,13 @@ module.exports = function(options, modified, total, callback) {
 
             requireEmail(authApi, validateApi, info, function(error) {
               if (error) {
-                // 更改：开启watch，也就是子进程里， 由于这里是异步操作，抛出错误， build监听不到,会导致子进程非0退出，子进程又自动重启，因此这里只打印错误
-                if (isChild) { // 开启watch了，有些错误不想做为非0退出，因为子进程非0退出，会重启
-                    fis.util.colorLog.error('Error: Auth failed! ' + error.errmsg);
-                }
-                else {
-                  throw new Error('Auth failed! ' + error.errmsg);
-                }
+                throw new Error('Auth failed! ' + error.errmsg);
               } else {
                 _upload(next);
               }
             });
           } else if (options.retry && !--reTryCount) {
-            // 更改：开启watch，也就是子进程里， 由于这里是异步操作，抛出错误， build监听不到,会导致子进程非0退出，子进程又自动重启，因此这里只打印错误
-            if (isChild) { // 开启watch了，有些错误不想做为非0退出，因为子进程非0退出，会重启
-                fis.util.colorLog.error('Error: ', error.errmsg || error);
-            }
-            else {
-              throw new Error('Auth failed! ' + error.errmsg);
-            }
+            throw new Error(error.errmsg || error);
           } else {
             _upload(next);
           }
