@@ -101,7 +101,7 @@ function requireEmail(authApi, validateApi, info, cb) {
     }
 
     info.email = ret.email;
-    deployInfo(info);
+    deployInfo(authApi, info);
 
     fetch(authApi, {
       email: ret.email
@@ -132,7 +132,7 @@ function requireToken(validateApi, info, cb) {
     }
 
     info.code = ret.code;
-    deployInfo(info);
+    deployInfo(validateApi, info);
 
     fetch(validateApi, {
       email: info.email,
@@ -143,32 +143,37 @@ function requireToken(validateApi, info, cb) {
       }
 
       info.token = ret.data.token;
-      deployInfo(info);
+      deployInfo(validateApi, info);
       cb(null, info);
     });
   })
 }
 
-function getTmpFile() {
-  return fis.project.getTempPath('deploy.json');
+function getTmpFile(host) {
+  return fis.project.getTempPath(`deploy-${host}.json`);
 }
 
-function deployInfo(options) {
-  var conf = getTmpFile();
+function read(conf) {
+  var ret = null;
 
-  if (arguments.length) {
+  try {
+    // getter
+    ret = fis.util.isFile(conf) ? require(conf) : null;
+  } catch (e) {
+
+  }
+  return ret;
+}
+
+function deployInfo(receiver, options) {
+  const urlInfo = new URL(receiver);
+  var conf = getTmpFile(urlInfo.host);
+
+  if (arguments.length > 1) {
     // setter
     return options && fis.util.write(conf, JSON.stringify(options, null, 2));
   } else {
-    var ret = null;
-
-    try {
-      // getter
-      ret = fis.util.isFile(conf) ? require(conf) : null;
-    } catch (e) {
-
-    }
-    return ret;
+    return read(conf);
   }
 };
 
@@ -177,7 +182,6 @@ module.exports = function(options, modified, total, callback) {
     throw new Error('options.to is required!');
   }
 
-  var info = deployInfo() || {};
   var to = options.to;
   var receiver = options.receiver;
   var authApi = options.authApi;
@@ -190,6 +194,8 @@ module.exports = function(options, modified, total, callback) {
     validateApi = options.validateApi = options.host + '/v1/validate';
   }
 
+  var info = deployInfo(receiver) || {};
+
   if (!options.receiver) {
     throw new Error('options.receiver is required!');
   }
@@ -197,9 +203,10 @@ module.exports = function(options, modified, total, callback) {
   var steps = [];
 
   modified.forEach(function(file) {
+    var reTryCount = options.retry;
     steps.push(function(next) {
       var _upload = arguments.callee;
-      var reTryCount = options.retry;
+
       data.email = info.email;
       data.token = info.token;
 
