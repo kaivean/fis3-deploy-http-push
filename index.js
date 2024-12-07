@@ -3,6 +3,7 @@
  */
 var _ = fis.util;
 var path = require('path');
+var fs = require('fs');
 var prompt = require('prompt');
 prompt.start();
 
@@ -152,6 +153,37 @@ function requireToken(validateApi, info, cb) {
 function getTmpFile(host) {
   return fis.project.getTempPath(`deploy-${host}.json`);
 }
+
+// 设置时间阈值（3个月前）
+const timeThreshold = new Date();
+timeThreshold.setMonth(timeThreshold.getMonth() - 3);
+
+function deleteOldDeployFilesSync(directoryPath) {
+    try {
+        // 读取目录内容（同步）
+        const files = fs.readdirSync(directoryPath);
+
+        // 过滤出以 'deploy-' 开头的 JSON 文件
+        const deployFiles = files.filter(file => file.startsWith('deploy-') && file.endsWith('.json'));
+
+        for (const file of deployFiles) {
+            const filePath = path.join(directoryPath, file);
+            const fileStat = fs.statSync(filePath);
+            console.log(`Deleting file: ${filePath}`);
+            // 检查文件的最后修改时间
+            if (fileStat.mtime < timeThreshold) {
+                console.log(`Deleting file: ${filePath}`);
+                fs.unlinkSync(filePath);
+            }
+        }
+
+        console.log('Operation completed.');
+    } catch (err) {
+        console.error(`Error occurred: ${err.message}`);
+    }
+}
+console.log('Deleting old deploy files...', fis.project.getTempPath());
+deleteOldDeployFilesSync(fis.project.getTempPath());
 
 function read(conf) {
   var ret = null;
