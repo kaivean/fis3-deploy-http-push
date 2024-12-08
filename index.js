@@ -169,20 +169,16 @@ function deleteOldDeployFilesSync(directoryPath) {
         for (const file of deployFiles) {
             const filePath = path.join(directoryPath, file);
             const fileStat = fs.statSync(filePath);
-            console.log(`Deleting file: ${filePath}`);
             // 检查文件的最后修改时间
             if (fileStat.mtime < timeThreshold) {
                 console.log(`Deleting file: ${filePath}`);
                 fs.unlinkSync(filePath);
             }
         }
-
-        console.log('Operation completed.');
     } catch (err) {
         console.error(`Error occurred: ${err.message}`);
     }
 }
-console.log('Deleting old deploy files...', fis.project.getTempPath());
 deleteOldDeployFilesSync(fis.project.getTempPath());
 
 function read(conf) {
